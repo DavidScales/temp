@@ -90,44 +90,46 @@ limitations under the License.
 
 // Return event as a Promise, because we don't want to show it until
 // after our API data loads
+const deferredPromptPromise = new Promise((resolve, reject) => {
+  window.addEventListener('beforeinstallprompt', event => {
+    console.log('---------------------beforeinstallprompt event----------');
 
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', event => {
-
-  // Prevent Chrome 67 and earlier from automatically showing the prompt
-  event.preventDefault();
-
-  deferredPrompt = event;
-  console.log('---------------------beforeinstallprompt event');
+    // Prevent Chrome 67 and earlier from automatically showing the prompt
+    event.preventDefault();
+    resolve(event);
+  });
 });
 
-function initInstallBtn() {
+function tryInitInstallBtn() {
 
-  // Add install functionality to user gesture
-  const btnInstall = document.getElementById('btn-install');
-  btnInstall.addEventListener('click', () => {
+  // Only initialize the install button if/after beforeinstallprompt event occurs
+  deferredPromptPromise.then(deferredPrompt => {
 
-    // Show the prompt
-    deferredPrompt.prompt();
+    // Add install functionality to user gesture
+    const btnInstall = document.getElementById('btn-install');
+    btnInstall.addEventListener('click', () => {
 
-    // Wait for the user to respond to the prompt
-    deferredPrompt.userChoice
-      .then(choiceResult => {
-        console.log('choiceResult', choiceResult);
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the A2HS prompt');
-        } else {
-          console.log('User dismissed the A2HS prompt');
-        }
-        deferredPrompt = null;
+      // Show the prompt
+      deferredPrompt.prompt();
 
-        // Hide our user interface interface
-        document.getElementById('install-wrapper').style.display = 'none';
-      });
-  });
+      // Wait for the user to respond to the prompt
+      deferredPrompt.userChoice
+        .then(choiceResult => {
+          console.log('choiceResult', choiceResult);
+          if (choiceResult.outcome === 'accepted') {
+            console.log('User accepted the A2HS prompt');
+          } else {
+            console.log('User dismissed the A2HS prompt');
+          }
 
-  // Show the user gesture interface
-  document.getElementById('install-wrapper').style.display = 'flex';
+          // Hide our user interface interface
+          document.getElementById('install-wrapper').style.display = 'none';
+        });
+    });
+
+    // Show the user gesture interface
+    document.getElementById('install-wrapper').style.display = 'flex';
+  })
 }
 
 
@@ -295,7 +297,6 @@ const renderQuestions = function(questions) {
     .join('');
 };
 
-let loaded = false;
 window.addEventListener('load', () => {
 
   fetchTopQuestions()
@@ -303,8 +304,8 @@ window.addEventListener('load', () => {
       const questionsHtml = renderQuestions(questions);
       document.getElementById('loading').style.display = 'none';
       document.getElementById('container').insertAdjacentHTML('beforeend', questionsHtml);
-      // Update UI notify the user they can add to home screen
-      initInstallBtn();
+      // Update UI to notify the user they can add to home screen
+      tryInitInstallBtn();
     })
     .catch(err => {
       console.log(err);
